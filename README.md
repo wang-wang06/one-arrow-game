@@ -133,6 +133,7 @@ PyCharm
 Pygame  
 Git  
 GitHub
+本项目自带中文字体文件 shiweiyongchunheicuti.ttf，克隆仓库后无需额外安装字体即可运行。
 ### 主要开发语言
 python  
 ### 使用的主要库
