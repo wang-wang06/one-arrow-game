@@ -4,7 +4,7 @@ import math
 import os
 import time
 import copy
-import json
+import random
 
 pygame.init()
 
@@ -115,55 +115,33 @@ BOARD_Y = 110
 
 
 # ============================================================
-# 关卡数据
+# 随机生成关卡设置
 # ============================================================
 
-LEVEL_DATA = {
-
-    1: [
-        (0, 0, "up"),
-        (3, 0, "up"),
-        (3, 4, "left"),
-        (6, 4, "up"),
-        (6, 1, "right"),
-        (2, 1, "down"),
-        (2, 6, "left"),
-        (5, 6, "up"),
-    ],
-
-    2: [
-        (0, 6, "up"),
-        (3, 6, "up"),
-        (3, 2, "right"),
-        (6, 2, "up"),
-        (6, 5, "left"),
-        (2, 5, "down"),
-        (2, 1, "right"),
-        (5, 1, "up"),
-    ],
-
-    3: [
-        (6, 0, "down"),
-        (3, 0, "down"),
-        (3, 5, "left"),
-        (0, 5, "down"),
-        (0, 2, "right"),
-        (4, 2, "up"),
-        (4, 6, "left"),
-        (1, 6, "down"),
-    ]
+# 每个关卡随机生成的飞镖数量
+LEVEL_ARROW_COUNT = {
+    1: 8,
+    2: 10,
+    3: 12,
+    4: 14,
+    5: 16,
+    6: 18
 }
 
-
-# ============================================================
 # 每个关卡允许的失误次数
-# ============================================================
-
 LEVEL_MISTAKES = {
     1: 3,
     2: 4,
-    3: 5
+    3: 5,
+    4: 5,
+    5: 6,
+    6: 7
 }
+
+MAX_LEVEL = 6
+
+# 随机生成最大尝试次数
+MAX_GENERATE_ATTEMPTS = 5000
 
 
 # ============================================================
@@ -175,13 +153,6 @@ SCORE_PER_ARROW = 100
 MISTAKE_PENALTY = 50
 
 MIN_SCORE = 0
-
-
-# ============================================================
-# 存档设置
-# ============================================================
-
-SAVE_FILE = "save.json"
 
 
 # ============================================================
@@ -247,10 +218,6 @@ HINT_DURATION = 120
 
 hint_timer = 0
 
-hint_message = ""
-
-hint_message_timer = 0
-
 
 # ============================================================
 # 当前剩余失误次数
@@ -287,7 +254,6 @@ COLLISION_DURATION = 30
 # 按钮位置
 # ============================================================
 
-# 开始按钮
 start_button_rect = pygame.Rect(
     350,
     430,
@@ -295,36 +261,49 @@ start_button_rect = pygame.Rect(
     70
 )
 
-# 继续游戏按钮
-continue_button_rect = pygame.Rect(
-    350,
-    515,
-    300,
-    60
-)
-
 
 # 关卡按钮
 level_button_rects = [
 
     pygame.Rect(
-        120,
-        250,
+        100,
         210,
+        240,
         90
     ),
 
     pygame.Rect(
-        395,
-        250,
+        380,
         210,
+        240,
         90
     ),
 
     pygame.Rect(
-        670,
-        250,
+        660,
         210,
+        240,
+        90
+    ),
+
+    pygame.Rect(
+        100,
+        340,
+        240,
+        90
+    ),
+
+    pygame.Rect(
+        380,
+        340,
+        240,
+        90
+    ),
+
+    pygame.Rect(
+        660,
+        340,
+        240,
         90
     )
 ]
@@ -388,10 +367,15 @@ restart_button_rect = pygame.Rect(
 # 工具函数
 # ============================================================
 
-def draw_text(text, font, color, center):
+def draw_text(
+    text,
+    font,
+    color,
+    center
+):
 
     surface = font.render(
-        str(text),
+        text,
         True,
         color
     )
@@ -518,78 +502,11 @@ def get_arrow_color(index):
 
 
 # ============================================================
-# 绘制箭头
+# 判断路径是否畅通
 # ============================================================
 
-def draw_arrow(
-    row,
-    col,
-    direction,
-    index,
-    shake_x=0
-):
-
-    center_x = (
-        BOARD_X
-        + col * CELL_SIZE
-        + CELL_SIZE // 2
-        + shake_x
-    )
-
-    center_y = (
-        BOARD_Y
-        + row * CELL_SIZE
-        + CELL_SIZE // 2
-    )
-
-    angle = get_arrow_angle(
-        direction
-    )
-
-    image = pygame.transform.rotate(
-        dart_original,
-        angle
-    )
-
-    color = get_arrow_color(
-        index
-    )
-
-    color_surface = pygame.Surface(
-        image.get_size(),
-        pygame.SRCALPHA
-    )
-
-    color_surface.fill(
-        (*color, 255)
-    )
-
-    image = image.copy()
-
-    image.blit(
-        color_surface,
-        (0, 0),
-        special_flags=pygame.BLEND_RGBA_MULT
-    )
-
-    rect = image.get_rect(
-        center=(
-            center_x,
-            center_y
-        )
-    )
-
-    screen.blit(
-        image,
-        rect
-    )
-
-
-# ============================================================
-# 判断箭头路径
-# ============================================================
-
-def is_path_clear(
+def is_path_clear_for_arrows(
+    arrow_list,
     row,
     col,
     direction
@@ -619,7 +536,7 @@ def is_path_clear(
         0 <= check_col < COLS
     ):
 
-        for arrow in arrows:
+        for arrow in arrow_list:
 
             if (
                 arrow["row"] == check_row
@@ -633,6 +550,284 @@ def is_path_clear(
         check_col += dc
 
     return True
+
+
+# ============================================================
+# 判断随机生成的关卡是否可通关
+# ============================================================
+
+def is_generated_level_solvable(
+    level_data
+):
+
+    remaining = [
+
+        {
+            "row": row,
+            "col": col,
+            "direction": direction
+        }
+
+        for row, col, direction
+        in level_data
+    ]
+
+    while remaining:
+
+        removable = None
+
+        # 找当前可以直接飞出的箭头
+        for arrow in remaining:
+
+            if is_path_clear_for_arrows(
+                remaining,
+                arrow["row"],
+                arrow["col"],
+                arrow["direction"]
+            ):
+
+                removable = arrow
+
+                break
+
+        # 没有可以消除的箭头
+        # 说明存在死锁
+        if removable is None:
+
+            return False
+
+        remaining.remove(
+            removable
+        )
+
+    return True
+
+
+# ============================================================
+# 生成随机可通关关卡
+# ============================================================
+
+def generate_random_level(
+    arrow_count
+):
+
+    directions = [
+        "up",
+        "down",
+        "left",
+        "right"
+    ]
+
+    all_cells = [
+
+        (row, col)
+
+        for row in range(ROWS)
+
+        for col in range(COLS)
+    ]
+
+    # --------------------------------------------------------
+    # 多次尝试随机生成
+    # --------------------------------------------------------
+
+    for attempt in range(
+        MAX_GENERATE_ATTEMPTS
+    ):
+
+        selected_cells = random.sample(
+            all_cells,
+            arrow_count
+        )
+
+        level_data = []
+
+        for row, col in selected_cells:
+
+            direction = random.choice(
+                directions
+            )
+
+            level_data.append(
+                (
+                    row,
+                    col,
+                    direction
+                )
+            )
+
+        # 检查是否存在完整通关顺序
+        if is_generated_level_solvable(
+            level_data
+        ):
+
+            return level_data
+
+    # --------------------------------------------------------
+    # 如果随机尝试失败
+    # 使用一个保证容易生成的备用方案
+    # --------------------------------------------------------
+
+    return generate_safe_level(
+        arrow_count
+    )
+
+
+# ============================================================
+# 备用可通关关卡生成
+# ============================================================
+
+def generate_safe_level(
+    arrow_count
+):
+
+    all_cells = [
+
+        (row, col)
+
+        for row in range(ROWS)
+
+        for col in range(COLS)
+    ]
+
+    random.shuffle(
+        all_cells
+    )
+
+    selected_cells = all_cells[
+        :arrow_count
+    ]
+
+    level_data = []
+
+    # --------------------------------------------------------
+    # 优先让箭头朝棋盘边缘方向
+    # --------------------------------------------------------
+
+    for row, col in selected_cells:
+
+        possible = []
+
+        if row > 0:
+            possible.append(
+                "up"
+            )
+
+        if row < ROWS - 1:
+            possible.append(
+                "down"
+            )
+
+        if col > 0:
+            possible.append(
+                "left"
+            )
+
+        if col < COLS - 1:
+            possible.append(
+                "right"
+            )
+
+        random.shuffle(
+            possible
+        )
+
+        chosen = None
+
+        # 优先寻找不会被当前已生成箭头挡住的方向
+        temp_arrows = [
+            {
+                "row": r,
+                "col": c,
+                "direction": d
+            }
+
+            for r, c, d
+            in level_data
+        ]
+
+        for direction in possible:
+
+            if is_path_clear_for_arrows(
+                temp_arrows,
+                row,
+                col,
+                direction
+            ):
+
+                chosen = direction
+
+                break
+
+        if chosen is None:
+
+            chosen = possible[0]
+
+        level_data.append(
+            (
+                row,
+                col,
+                chosen
+            )
+        )
+
+    # 再验证一次
+    if is_generated_level_solvable(
+        level_data
+    ):
+
+        return level_data
+
+    # 最后采用非常稳定的边缘布局
+    level_data = []
+
+    cells = [
+
+        (0, 0, "up"),
+        (0, 2, "up"),
+        (0, 4, "up"),
+        (0, 6, "up"),
+
+        (2, 0, "left"),
+        (2, 6, "right"),
+
+        (4, 0, "left"),
+        (4, 6, "right"),
+
+        (6, 0, "down"),
+        (6, 2, "down"),
+        (6, 4, "down"),
+        (6, 6, "down")
+    ]
+
+    random.shuffle(
+        cells
+    )
+
+    return cells[
+        :min(
+            arrow_count,
+            len(cells)
+        )
+    ]
+
+
+# ============================================================
+# 判断当前箭头路径
+# ============================================================
+
+def is_path_clear(
+    row,
+    col,
+    direction
+):
+
+    return is_path_clear_for_arrows(
+        arrows,
+        row,
+        col,
+        direction
+    )
 
 
 # ============================================================
@@ -883,249 +1078,12 @@ def draw_flying_arrows():
 
 
 # ============================================================
-# 保存游戏进度
-# ============================================================
-
-def save_game_progress():
-
-    global level_start_time
-
-    if not game_started:
-        return
-
-    if level_selecting:
-        return
-
-    if all_levels_finished:
-        return
-
-    elapsed = get_current_elapsed_time()
-
-    data = {
-
-        "current_level": current_level,
-
-        "unlocked_level": unlocked_level,
-
-        "mistakes": mistakes,
-
-        "score": score,
-
-        "elapsed_time": elapsed,
-
-        "final_time": final_time,
-
-        "final_mistakes_used": final_mistakes_used,
-
-        "current_stars": current_stars,
-
-        "level_finished": level_finished,
-
-        "game_failed": game_failed,
-
-        "arrows": copy.deepcopy(arrows)
-    }
-
-    try:
-
-        with open(
-            SAVE_FILE,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            json.dump(
-                data,
-                f,
-                ensure_ascii=False,
-                indent=4
-            )
-
-    except Exception as e:
-
-        print(
-            "保存游戏进度失败：",
-            e
-        )
-
-
-# ============================================================
-# 读取游戏进度
-# ============================================================
-
-def load_game_progress():
-
-    global game_started
-    global level_selecting
-    global level_finished
-    global game_failed
-    global all_levels_finished
-
-    global current_level
-    global unlocked_level
-
-    global arrows
-    global moving_arrows
-
-    global mistakes
-    global score
-
-    global level_start_time
-    global final_time
-    global final_mistakes_used
-    global current_stars
-
-    global undo_history
-    global collision_effect
-
-    if not os.path.exists(SAVE_FILE):
-
-        return False
-
-    try:
-
-        with open(
-            SAVE_FILE,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            data = json.load(f)
-
-        current_level = int(
-            data["current_level"]
-        )
-
-        unlocked_level = int(
-            data.get(
-                "unlocked_level",
-                current_level
-            )
-        )
-
-        mistakes = int(
-            data["mistakes"]
-        )
-
-        score = int(
-            data["score"]
-        )
-
-        elapsed = float(
-            data.get(
-                "elapsed_time",
-                0
-            )
-        )
-
-        final_time = float(
-            data.get(
-                "final_time",
-                0
-            )
-        )
-
-        final_mistakes_used = int(
-            data.get(
-                "final_mistakes_used",
-                0
-            )
-        )
-
-        current_stars = int(
-            data.get(
-                "current_stars",
-                0
-            )
-        )
-
-        arrows = copy.deepcopy(
-            data.get(
-                "arrows",
-                []
-            )
-        )
-
-        moving_arrows = []
-
-        undo_history = []
-
-        collision_effect = None
-
-        level_finished = bool(
-            data.get(
-                "level_finished",
-                False
-            )
-        )
-
-        game_failed = bool(
-            data.get(
-                "game_failed",
-                False
-            )
-        )
-
-        all_levels_finished = False
-
-        game_started = True
-
-        level_selecting = False
-
-        # 根据已经进行的时间恢复计时
-        if level_finished or game_failed:
-
-            level_start_time = (
-                time.time()
-                - final_time
-            )
-
-        else:
-
-            level_start_time = (
-                time.time()
-                - elapsed
-            )
-
-        return True
-
-    except Exception as e:
-
-        print(
-            "读取游戏进度失败：",
-            e
-        )
-
-        return False
-
-
-# ============================================================
-# 删除游戏进度
-# ============================================================
-
-def delete_game_progress():
-
-    if os.path.exists(SAVE_FILE):
-
-        try:
-
-            os.remove(
-                SAVE_FILE
-            )
-
-        except Exception as e:
-
-            print(
-                "删除存档失败：",
-                e
-            )
-
-
-# ============================================================
 # 加载关卡
 # ============================================================
 
-def load_level(level_number):
+def load_level(
+    level_number
+):
 
     global arrows
     global moving_arrows
@@ -1146,8 +1104,6 @@ def load_level(level_number):
 
     global hint_arrow
     global hint_timer
-    global hint_message
-    global hint_message_timer
 
     current_level = level_number
 
@@ -1157,6 +1113,10 @@ def load_level(level_number):
 
     undo_history = []
 
+    hint_arrow = None
+
+    hint_timer = 0
+
     level_finished = False
 
     game_failed = False
@@ -1164,14 +1124,6 @@ def load_level(level_number):
     all_levels_finished = False
 
     collision_effect = None
-
-    hint_arrow = None
-
-    hint_timer = 0
-
-    hint_message = ""
-
-    hint_message_timer = 0
 
     mistakes = LEVEL_MISTAKES[
         current_level
@@ -1187,8 +1139,24 @@ def load_level(level_number):
 
     current_stars = 0
 
+    # --------------------------------------------------------
+    # 随机生成当前关卡
+    # --------------------------------------------------------
+
+    arrow_count = LEVEL_ARROW_COUNT[
+        current_level
+    ]
+
+    random_level = generate_random_level(
+        arrow_count
+    )
+
+    # --------------------------------------------------------
+    # 创建箭头对象
+    # --------------------------------------------------------
+
     for index, data in enumerate(
-        LEVEL_DATA[current_level]
+        random_level
     ):
 
         row, col, direction = data
@@ -1246,8 +1214,6 @@ def finish_level():
 
         score += 50
 
-    save_game_progress()
-
 
 # ============================================================
 # 保存撤销状态
@@ -1259,19 +1225,20 @@ def save_undo_state():
 
     state = {
 
-        "arrows": copy.deepcopy(arrows),
+        "arrows":
+            copy.deepcopy(arrows),
 
-        "score": score,
+        "score":
+            score,
 
-        "mistakes": mistakes,
+        "mistakes":
+            mistakes,
 
-        "moving_arrows": copy.deepcopy(
-            moving_arrows
-        ),
+        "moving_arrows":
+            copy.deepcopy(moving_arrows),
 
-        "collision_effect": copy.deepcopy(
-            collision_effect
-        )
+        "collision_effect":
+            copy.deepcopy(collision_effect)
     }
 
     undo_history.append(
@@ -1294,20 +1261,12 @@ def undo_last_move():
     global mistakes
     global moving_arrows
     global collision_effect
-
     global level_finished
     global game_failed
-
     global hint_arrow
     global hint_timer
 
-    global hint_message
-    global hint_message_timer
-
     if len(undo_history) == 0:
-
-        hint_message = "没有可以撤销的操作"
-        hint_message_timer = 120
 
         return False
 
@@ -1337,12 +1296,6 @@ def undo_last_move():
 
     hint_timer = 0
 
-    hint_message = "已撤销上一步操作"
-
-    hint_message_timer = 120
-
-    save_game_progress()
-
     return True
 
 
@@ -1355,22 +1308,15 @@ def show_hint():
     global hint_arrow
     global hint_timer
 
-    global hint_message
-    global hint_message_timer
-
     if len(arrows) == 0:
 
         hint_arrow = None
 
         hint_timer = 0
 
-        hint_message = "当前没有可提示的飞镖"
-
-        hint_message_timer = 120
-
         return
 
-    # 找一个当前可以直接飞出的飞镖
+    # 优先寻找当前可以直接飞出的箭头
     for arrow in arrows:
 
         row = arrow["row"]
@@ -1389,20 +1335,11 @@ def show_hint():
 
             hint_timer = HINT_DURATION
 
-            hint_message = "黄色高亮的飞镖可以直接飞出"
-
-            hint_message_timer = HINT_DURATION
-
             return
 
-    # 没有可以直接消除的箭头
     hint_arrow = None
 
-    hint_timer = 0
-
-    hint_message = "当前没有可以直接消除的飞镖"
-
-    hint_message_timer = 120
+    hint_timer = HINT_DURATION
 
 
 # ============================================================
@@ -1414,24 +1351,17 @@ def update_hint():
     global hint_timer
     global hint_arrow
 
-    global hint_message_timer
-    global hint_message
+    if hint_timer <= 0:
 
-    if hint_timer > 0:
+        hint_arrow = None
 
-        hint_timer -= 1
+        return
 
-        if hint_timer <= 0:
+    hint_timer -= 1
 
-            hint_arrow = None
+    if hint_timer <= 0:
 
-    if hint_message_timer > 0:
-
-        hint_message_timer -= 1
-
-        if hint_message_timer <= 0:
-
-            hint_message = ""
+        hint_arrow = None
 
 
 # ============================================================
@@ -1441,6 +1371,12 @@ def update_hint():
 def draw_hint_effect():
 
     if hint_arrow is None:
+
+        return
+
+    # 防止提示对象已经被删除
+    if hint_arrow not in arrows:
+
         return
 
     row = hint_arrow["row"]
@@ -1503,9 +1439,6 @@ def handle_arrow_click(
 
     global score
 
-    global hint_arrow
-    global hint_timer
-
     mouse_x, mouse_y = mouse_pos
 
     clicked_arrow = None
@@ -1543,13 +1476,8 @@ def handle_arrow_click(
             break
 
     if clicked_arrow is None:
+
         return
-
-    # 在执行操作之前保存状态
-    save_undo_state()
-
-    hint_arrow = None
-    hint_timer = 0
 
     row = clicked_arrow["row"]
 
@@ -1559,11 +1487,18 @@ def handle_arrow_click(
 
     index = clicked_arrow["index"]
 
+    # --------------------------------------------------------
+    # 可以飞出
+    # --------------------------------------------------------
+
     if is_path_clear(
         row,
         col,
         direction
     ):
+
+        # 在修改棋盘之前保存撤销状态
+        save_undo_state()
 
         score += SCORE_PER_ARROW
 
@@ -1578,22 +1513,30 @@ def handle_arrow_click(
             clicked_arrow
         )
 
+        # 当前提示箭头被消除
+        global hint_arrow
+        global hint_timer
+
+        hint_arrow = None
+        hint_timer = 0
+
         if len(arrows) == 0:
 
             finish_level()
 
-        else:
-
-            save_game_progress()
+    # --------------------------------------------------------
+    # 被阻挡
+    # --------------------------------------------------------
 
     else:
+
+        # 失误也允许撤销
+        save_undo_state()
 
         trigger_collision(
             row,
             col
         )
-
-        save_game_progress()
 
 
 # ============================================================
@@ -1642,7 +1585,7 @@ def draw_board():
                 width=1
             )
 
-    # 先画提示效果
+    # 提示效果
     draw_hint_effect()
 
     for index, arrow in enumerate(
@@ -1669,6 +1612,74 @@ def draw_board():
         )
 
     draw_collision_effect()
+
+
+# ============================================================
+# 绘制箭头
+# ============================================================
+
+def draw_arrow(
+    row,
+    col,
+    direction,
+    index,
+    shake_x=0
+):
+
+    center_x = (
+        BOARD_X
+        + col * CELL_SIZE
+        + CELL_SIZE // 2
+        + shake_x
+    )
+
+    center_y = (
+        BOARD_Y
+        + row * CELL_SIZE
+        + CELL_SIZE // 2
+    )
+
+    angle = get_arrow_angle(
+        direction
+    )
+
+    image = pygame.transform.rotate(
+        dart_original,
+        angle
+    )
+
+    color = get_arrow_color(
+        index
+    )
+
+    color_surface = pygame.Surface(
+        image.get_size(),
+        pygame.SRCALPHA
+    )
+
+    color_surface.fill(
+        (*color, 255)
+    )
+
+    image = image.copy()
+
+    image.blit(
+        color_surface,
+        (0, 0),
+        special_flags=pygame.BLEND_RGBA_MULT
+    )
+
+    rect = image.get_rect(
+        center=(
+            center_x,
+            center_y
+        )
+    )
+
+    screen.blit(
+        image,
+        rect
+    )
 
 
 # ============================================================
@@ -1701,7 +1712,6 @@ def draw_start_screen():
         )
     )
 
-    # 规则框
     rule_rect = pygame.Rect(
         220,
         225,
@@ -1761,28 +1771,6 @@ def draw_start_screen():
         BLUE
     )
 
-    # ========================================================
-    # 继续游戏按钮
-    # ========================================================
-
-    if os.path.exists(SAVE_FILE):
-
-        draw_button(
-            continue_button_rect,
-            "继续游戏",
-            font_medium,
-            GREEN
-        )
-
-    else:
-
-        draw_button(
-            continue_button_rect,
-            "暂无存档",
-            font_medium,
-            LOCK_GRAY
-        )
-
 
 # ============================================================
 # 关卡选择
@@ -1800,7 +1788,7 @@ def draw_level_select_screen():
         DARK_GRAY,
         (
             WIDTH // 2,
-            85
+            70
         )
     )
 
@@ -1810,11 +1798,11 @@ def draw_level_select_screen():
         GRAY,
         (
             WIDTH // 2,
-            150
+            125
         )
     )
 
-    for i in range(3):
+    for i in range(MAX_LEVEL):
 
         level_number = i + 1
 
@@ -1823,8 +1811,11 @@ def draw_level_select_screen():
         if level_number <= unlocked_level:
 
             if level_number == current_level:
+
                 button_color = GREEN
+
             else:
+
                 button_color = BLUE
 
             draw_button(
@@ -1835,12 +1826,12 @@ def draw_level_select_screen():
             )
 
             draw_text(
-                f"允许失误 {LEVEL_MISTAKES[level_number]} 次",
+                f"{LEVEL_ARROW_COUNT[level_number]} 个飞镖",
                 font_small,
                 DARK_GRAY,
                 (
                     rect.centerx,
-                    375
+                    rect.bottom + 25
                 )
             )
 
@@ -1859,17 +1850,17 @@ def draw_level_select_screen():
                 GRAY,
                 (
                     rect.centerx,
-                    375
+                    rect.bottom + 25
                 )
             )
 
     draw_text(
-        "完成当前关卡后即可解锁下一关",
+        "每次进入关卡都会随机生成新的棋盘",
         font_small,
         GRAY,
         (
             WIDTH // 2,
-            500
+            485
         )
     )
 
@@ -2012,18 +2003,21 @@ def draw_game_screen():
 
     if len(undo_history) > 0:
 
-        undo_color = BLUE
+        draw_button(
+            undo_button_rect,
+            "撤销上一步",
+            font_small,
+            BLUE
+        )
 
     else:
 
-        undo_color = LOCK_GRAY
-
-    draw_button(
-        undo_button_rect,
-        "撤销上一步",
-        font_small,
-        undo_color
-    )
+        draw_button(
+            undo_button_rect,
+            "暂无可撤销",
+            font_small,
+            LOCK_GRAY
+        )
 
     # ========================================================
     # 重新开始
@@ -2054,22 +2048,6 @@ def draw_game_screen():
             "前方有阻挡！",
             font_medium,
             RED,
-            (
-                WIDTH // 2,
-                650
-            )
-        )
-
-    # ========================================================
-    # 提示文字
-    # ========================================================
-
-    if hint_message:
-
-        draw_text(
-            hint_message,
-            font_small,
-            YELLOW if hint_arrow is not None else RED,
             (
                 WIDTH // 2,
                 650
@@ -2112,8 +2090,11 @@ def draw_stars(
         )
 
         if i < stars:
+
             color = YELLOW
+
         else:
+
             color = (210, 210, 210)
 
         points = []
@@ -2126,8 +2107,11 @@ def draw_stars(
             )
 
             if j % 2 == 0:
+
                 radius = star_size / 2
+
             else:
+
                 radius = star_size / 4
 
             px = (
@@ -2248,7 +2232,7 @@ def draw_level_finished_screen():
         )
     )
 
-    if current_level < 3:
+    if current_level < MAX_LEVEL:
 
         draw_button(
             next_level_button_rect,
@@ -2382,7 +2366,7 @@ def draw_all_finished_screen():
     )
 
     draw_text(
-        "恭喜你完成了全部三个关卡",
+        f"恭喜你完成了全部 {MAX_LEVEL} 个关卡",
         font_medium,
         DARK_GRAY,
         (
@@ -2425,9 +2409,6 @@ while running:
 
         if event.type == pygame.QUIT:
 
-            # 关闭游戏之前自动保存
-            save_game_progress()
-
             running = False
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -2451,18 +2432,6 @@ while running:
                     game_started = True
 
                     level_selecting = True
-
-                elif (
-                    continue_button_rect.collidepoint(
-                        mouse_pos
-                    )
-                    and
-                    os.path.exists(SAVE_FILE)
-                ):
-
-                    if not load_game_progress():
-
-                        print("读取存档失败")
 
             # =================================================
             # 关卡选择
@@ -2496,8 +2465,6 @@ while running:
 
                         game_started = True
 
-                        save_game_progress()
-
                         break
 
             # =================================================
@@ -2513,8 +2480,6 @@ while running:
                     load_level(
                         current_level
                     )
-
-                    save_game_progress()
 
                 elif back_select_button_rect.collidepoint(
                     mouse_pos
@@ -2538,8 +2503,6 @@ while running:
 
                     level_selecting = True
 
-                    delete_game_progress()
-
             # =================================================
             # 当前关卡通关
             # =================================================
@@ -2550,7 +2513,7 @@ while running:
                     mouse_pos
                 ):
 
-                    if current_level < 3:
+                    if current_level < MAX_LEVEL:
 
                         next_level = (
                             current_level + 1
@@ -2565,15 +2528,11 @@ while running:
                             next_level
                         )
 
-                        save_game_progress()
-
                     else:
 
                         level_finished = False
 
                         all_levels_finished = True
-
-                        delete_game_progress()
 
                 elif back_select_button_rect.collidepoint(
                     mouse_pos
@@ -2589,22 +2548,11 @@ while running:
 
             elif game_started:
 
-                # 提示
-                if hint_button_rect.collidepoint(
-                    mouse_pos
-                ):
-
-                    show_hint()
-
-                # 撤销
-                elif undo_button_rect.collidepoint(
-                    mouse_pos
-                ):
-
-                    undo_last_move()
-
+                # ------------------------------------------------
                 # 重新开始
-                elif restart_game_button_rect.collidepoint(
+                # ------------------------------------------------
+
+                if restart_game_button_rect.collidepoint(
                     mouse_pos
                 ):
 
@@ -2612,13 +2560,39 @@ while running:
                         current_level
                     )
 
-                    save_game_progress()
+                # ------------------------------------------------
+                # 提示
+                # ------------------------------------------------
+
+                elif hint_button_rect.collidepoint(
+                    mouse_pos
+                ):
+
+                    show_hint()
+
+                # ------------------------------------------------
+                # 撤销
+                # ------------------------------------------------
+
+                elif undo_button_rect.collidepoint(
+                    mouse_pos
+                ):
+
+                    undo_last_move()
+
+                # ------------------------------------------------
+                # 点击棋盘
+                # ------------------------------------------------
 
                 else:
 
                     handle_arrow_click(
                         mouse_pos
                     )
+
+                    # ------------------------------------------------
+                    # 失误次数耗尽
+                    # ------------------------------------------------
 
                     if mistakes <= 0:
 
@@ -2630,8 +2604,6 @@ while running:
                         game_failed = True
 
                         collision_effect = None
-
-                        save_game_progress()
 
     # ========================================================
     # 更新
@@ -2699,8 +2671,6 @@ while running:
 # ============================================================
 # 退出
 # ============================================================
-
-save_game_progress()
 
 pygame.quit()
 
