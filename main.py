@@ -117,7 +117,7 @@ if FONT_PATH:
     font_tiny = pygame.font.Font(FONT_PATH, 16)
     font_pop = pygame.font.Font(FONT_PATH, 26)
 else:
-    # 如果连系统字体都没有，只能退回默认字体（会显示方块乱码）
+
     print("错误：未找到任何可用中文字体，中文可能显示为方块。")
     font_title = pygame.font.SysFont("simhei", 58)
     font_big = pygame.font.SysFont("simhei", 42)
