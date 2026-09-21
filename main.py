@@ -1,12 +1,14 @@
 import pygame
 import sys
 import math
+import os
 
 pygame.init()
 
-# =========================
+# ============================================================
 # 基本设置
-# =========================
+# ============================================================
+
 WIDTH = 1000
 HEIGHT = 700
 
@@ -15,120 +17,102 @@ pygame.display.set_caption("一箭又一箭")
 
 clock = pygame.time.Clock()
 
-# =========================
+
+# ============================================================
 # 颜色
-# =========================
+# ============================================================
+
 WHITE = (255, 255, 255)
 BLACK = (30, 30, 30)
-DARK_GRAY = (60, 65, 75)
-GRAY = (130, 135, 145)
-LIGHT_GRAY = (235, 238, 243)
 
-BLUE = (75, 120, 190)
-LIGHT_BLUE = (220, 232, 250)
+GRAY = (120, 120, 120)
+LIGHT_GRAY = (235, 238, 242)
+DARK_GRAY = (70, 75, 80)
+
+BLUE = (75, 120, 180)
+LIGHT_BLUE = (220, 235, 250)
 
 GREEN = (80, 170, 110)
-LIGHT_GREEN = (220, 245, 225)
 
-RED = (230, 70, 70)
+RED = (220, 80, 80)
 LIGHT_RED = (255, 225, 225)
 
-ORANGE = (240, 150, 60)
-YELLOW = (245, 200, 70)
+YELLOW = (240, 190, 70)
 
-GRID_COLOR = (190, 195, 205)
-BOARD_COLOR = (245, 247, 250)
+LOCK_GRAY = (180, 180, 180)
 
-# =========================
-# 字体
-# =========================
-# =========================
+
+# ============================================================
 # 中文字体
-# =========================
+# ============================================================
 
-FONT_PATH = "C:/Windows/Fonts/msyh.ttc"
+FONT_PATHS = [
+    "C:/Windows/Fonts/msyh.ttc",
+    "C:/Windows/Fonts/simhei.ttf",
+    "C:/Windows/Fonts/simsun.ttc"
+]
 
-font_title = pygame.font.Font(FONT_PATH, 64)
-font_big = pygame.font.Font(FONT_PATH, 48)
-font_medium = pygame.font.Font(FONT_PATH, 36)
-font_normal = pygame.font.Font(FONT_PATH, 28)
-font_small = pygame.font.Font(FONT_PATH, 23)
+FONT_PATH = None
 
-# =========================
-# 棋盘
-# =========================
+for path in FONT_PATHS:
+    if os.path.exists(path):
+        FONT_PATH = path
+        break
+
+if FONT_PATH:
+    font_title = pygame.font.Font(FONT_PATH, 58)
+    font_big = pygame.font.Font(FONT_PATH, 42)
+    font_medium = pygame.font.Font(FONT_PATH, 32)
+    font_normal = pygame.font.Font(FONT_PATH, 25)
+    font_small = pygame.font.Font(FONT_PATH, 20)
+else:
+    font_title = pygame.font.SysFont("simhei", 58)
+    font_big = pygame.font.SysFont("simhei", 42)
+    font_medium = pygame.font.SysFont("simhei", 32)
+    font_normal = pygame.font.SysFont("simhei", 25)
+    font_small = pygame.font.SysFont("simhei", 20)
+
+
+# ============================================================
+# 飞镖图片
+# ============================================================
+
+DART_IMAGE_PATH = "assets/dart.png"
+
+if not os.path.exists(DART_IMAGE_PATH):
+    print("错误：找不到 assets/dart.png")
+    pygame.quit()
+    sys.exit()
+
+dart_original = pygame.image.load(
+    DART_IMAGE_PATH
+).convert_alpha()
+
+DART_SIZE = 52
+
+dart_original = pygame.transform.smoothscale(
+    dart_original,
+    (DART_SIZE, DART_SIZE)
+)
+
+
+# ============================================================
+# 棋盘设置
+# ============================================================
+
 ROWS = 7
 COLS = 7
+
 CELL_SIZE = 70
 
 BOARD_X = 255
 BOARD_Y = 110
 
-# =========================
-# 图片
-# =========================
-DART_IMAGE = pygame.image.load(
-    "assets/dart.png"
-).convert_alpha()
 
-# 统一箭头尺寸
-DART_SIZE = 48
+# ============================================================
+# 关卡数据
+# ============================================================
 
-DART_IMAGE = pygame.transform.smoothscale(
-    DART_IMAGE,
-    (DART_SIZE, DART_SIZE)
-)
-
-# 原始图片中的箭头尖端方向为：↙
-#
-# 因此：
-# right → 135°
-# up    → -135°
-# left  → -45°
-# down  → 45°
-ANGLE_MAP = {
-    "right": 135,
-    "up": -135,
-    "left": -45,
-    "down": 45
-}
-
-DIRECTION_VECTOR = {
-    "up": (-1, 0),
-    "down": (1, 0),
-    "left": (0, -1),
-    "right": (0, 1)
-}
-
-# =========================
-# 按钮
-# =========================
-start_button_rect = pygame.Rect(
-    350, 250, 300, 80
-)
-
-level_button_rects = [
-    pygame.Rect(180, 250, 180, 90),
-    pygame.Rect(410, 250, 180, 90),
-    pygame.Rect(640, 250, 180, 90)
-]
-
-restart_button_rect = pygame.Rect(
-    350, 380, 300, 70
-)
-
-back_select_button_rect = pygame.Rect(
-    350, 470, 300, 65
-)
-
-# 游戏过程中重新开始当前关卡
-restart_game_button_rect = pygame.Rect(
-    770, 520, 170, 55
-)
-
-# =========================
-# 三个关卡
-# =========================
 LEVEL_DATA = {
 
     1: [
@@ -165,93 +149,180 @@ LEVEL_DATA = {
     ]
 }
 
-# =========================
+
+# ============================================================
+# 每个关卡允许的失误次数
+# ============================================================
+
+LEVEL_MISTAKES = {
+    1: 3,
+    2: 4,
+    3: 5
+}
+
+
+# ============================================================
 # 游戏状态
-# =========================
+# ============================================================
+
 game_started = False
+
 level_selecting = False
+
 level_finished = False
+
 game_failed = False
+
 all_levels_finished = False
 
+
+# 当前关卡
 current_level = 1
 
-# 当前关卡剩余箭头
+# 当前已经解锁到第几关
+unlocked_level = 1
+
+
+# ============================================================
+# 游戏对象
+# ============================================================
+
 arrows = []
 
-# 飞出中的箭头
 moving_arrows = []
 
-# 错误次数
-MAX_MISTAKES = 3
-mistakes = MAX_MISTAKES
 
-# =========================
+# ============================================================
+# 当前剩余失误次数
+# ============================================================
+
+mistakes = LEVEL_MISTAKES[current_level]
+
+
+# ============================================================
 # 碰撞反馈
-# =========================
+# ============================================================
+
 collision_effect = None
 
-# 碰撞反馈持续时间
 COLLISION_DURATION = 30
 
-# =========================
-# 箭头颜色
-# =========================
-ARROW_COLORS = [
-    (70, 120, 190),
-    (90, 150, 210),
-    (100, 180, 130),
-    (235, 150, 70),
-    (180, 110, 190),
-    (80, 170, 170),
-    (220, 100, 100),
-    (120, 130, 190)
+
+# ============================================================
+# 按钮位置
+# ============================================================
+
+# 开始按钮
+start_button_rect = pygame.Rect(
+    350,
+    430,
+    300,
+    75
+)
+
+
+# 关卡按钮
+level_button_rects = [
+
+    pygame.Rect(
+        120,
+        250,
+        210,
+        90
+    ),
+
+    pygame.Rect(
+        395,
+        250,
+        210,
+        90
+    ),
+
+    pygame.Rect(
+        670,
+        250,
+        210,
+        90
+    )
 ]
 
 
+# 游戏中重新开始
+restart_game_button_rect = pygame.Rect(
+    770,
+    105,
+    170,
+    55
+)
+
+
+# 通关后进入下一关
+next_level_button_rect = pygame.Rect(
+    350,
+    350,
+    300,
+    70
+)
+
+
+# 返回关卡选择
+back_select_button_rect = pygame.Rect(
+    350,
+    455,
+    300,
+    60
+)
+
+
+# 失败后重新挑战
+restart_button_rect = pygame.Rect(
+    350,
+    350,
+    300,
+    70
+)
+
+
 # ============================================================
-# 辅助函数
+# 工具函数
 # ============================================================
 
-def draw_text(text, font, color, x, y, center=True):
-    """绘制文字"""
+def draw_text(text, font, color, center):
 
-    surface = font.render(text, True, color)
+    surface = font.render(
+        text,
+        True,
+        color
+    )
 
-    if center:
-        rect = surface.get_rect(
-            center=(x, y)
-        )
-    else:
-        rect = surface.get_rect(
-            topleft=(x, y)
-        )
+    rect = surface.get_rect(
+        center=center
+    )
 
-    screen.blit(surface, rect)
+    screen.blit(
+        surface,
+        rect
+    )
 
 
-def draw_button(rect, text, color=BLUE):
-    """绘制按钮"""
-
-    mouse_pos = pygame.mouse.get_pos()
-
-    if rect.collidepoint(mouse_pos):
-        button_color = tuple(
-            min(255, c + 20) for c in color
-        )
-    else:
-        button_color = color
+def draw_button(
+    rect,
+    text,
+    font,
+    bg_color,
+    text_color=WHITE
+):
 
     pygame.draw.rect(
         screen,
-        button_color,
+        bg_color,
         rect,
         border_radius=12
     )
 
     pygame.draw.rect(
         screen,
-        DARK_GRAY,
+        (60, 65, 70),
         rect,
         width=2,
         border_radius=12
@@ -259,314 +330,204 @@ def draw_button(rect, text, color=BLUE):
 
     draw_text(
         text,
-        font_medium,
-        WHITE,
-        rect.centerx,
-        rect.centery
+        font,
+        text_color,
+        rect.center
     )
 
 
-def get_arrow_angle(direction):
-    """获得箭头旋转角度"""
+# ============================================================
+# 箭头角度
+# ============================================================
 
-    return ANGLE_MAP[direction]
+def get_arrow_angle(direction):
+
+    # dart.png 原始尖端方向为 ↙
+
+    angle_map = {
+
+        "right": 135,
+
+        "up": -135,
+
+        "left": -45,
+
+        "down": 45
+    }
+
+    return angle_map[direction]
+
+
+# ============================================================
+# 箭头颜色
+# ============================================================
+
+ARROW_COLORS = [
+
+    (75, 120, 180),
+
+    (90, 160, 120),
+
+    (210, 140, 70),
+
+    (160, 100, 170),
+
+    (70, 150, 160),
+
+    (190, 100, 100)
+]
 
 
 def get_arrow_color(index):
-    """获得箭头颜色"""
 
-    return ARROW_COLORS[index % len(ARROW_COLORS)]
+    return ARROW_COLORS[
+        index % len(ARROW_COLORS)
+    ]
 
 
-def colorize_image(image, color):
-    """
-    给箭头图片染色
-    """
-
-    result = image.copy()
-
-    color_surface = pygame.Surface(
-        result.get_size(),
-        pygame.SRCALPHA
-    )
-
-    color_surface.fill(color)
-
-    result.blit(
-        color_surface,
-        (0, 0),
-        special_flags=pygame.BLEND_RGBA_MULT
-    )
-
-    return result
-
+# ============================================================
+# 绘制箭头
+# ============================================================
 
 def draw_arrow(
-        row,
-        col,
-        direction,
-        index,
-        shake_x=0,
-        shake_y=0,
-        force_red=False
+    row,
+    col,
+    direction,
+    index,
+    shake_x=0
 ):
-    """
-    在棋盘上绘制箭头
-    """
 
-    x = (
+    center_x = (
         BOARD_X
         + col * CELL_SIZE
         + CELL_SIZE // 2
+        + shake_x
     )
 
-    y = (
+    center_y = (
         BOARD_Y
         + row * CELL_SIZE
         + CELL_SIZE // 2
     )
 
-    x += shake_x
-    y += shake_y
-
-    if force_red:
-        color = (245, 65, 65)
-    else:
-        color = get_arrow_color(index)
-
-    image = colorize_image(
-        DART_IMAGE,
-        color
+    angle = get_arrow_angle(
+        direction
     )
 
-    angle = get_arrow_angle(direction)
-
-    rotated = pygame.transform.rotate(
-        image,
+    image = pygame.transform.rotate(
+        dart_original,
         angle
     )
 
-    rect = rotated.get_rect(
-        center=(x, y)
+    color = get_arrow_color(
+        index
+    )
+
+    color_surface = pygame.Surface(
+        image.get_size(),
+        pygame.SRCALPHA
+    )
+
+    color_surface.fill(
+        (*color, 255)
+    )
+
+    image = image.copy()
+
+    image.blit(
+        color_surface,
+        (0, 0),
+        special_flags=pygame.BLEND_RGBA_MULT
+    )
+
+    rect = image.get_rect(
+        center=(
+            center_x,
+            center_y
+        )
     )
 
     screen.blit(
-        rotated,
+        image,
         rect
     )
 
 
 # ============================================================
-# 路径判断
+# 判断箭头路径
 # ============================================================
 
-def is_path_clear(row, col, direction):
-    """
-    判断箭头前方是否有其他箭头
+def is_path_clear(
+    row,
+    col,
+    direction
+):
 
-    True  = 没有阻挡，可以飞出
-    False = 有阻挡，不能飞出
-    """
+    dr = 0
+    dc = 0
 
-    dr, dc = DIRECTION_VECTOR[direction]
+    if direction == "up":
+        dr = -1
 
-    next_row = row + dr
-    next_col = col + dc
+    elif direction == "down":
+        dr = 1
+
+    elif direction == "left":
+        dc = -1
+
+    elif direction == "right":
+        dc = 1
+
+    check_row = row + dr
+    check_col = col + dc
 
     while (
-        0 <= next_row < ROWS
+        0 <= check_row < ROWS
         and
-        0 <= next_col < COLS
+        0 <= check_col < COLS
     ):
 
         for arrow in arrows:
 
-            ar, ac, _ = arrow
+            if (
+                arrow["row"] == check_row
+                and
+                arrow["col"] == check_col
+            ):
 
-            if ar == next_row and ac == next_col:
                 return False
 
-        next_row += dr
-        next_col += dc
+        check_row += dr
+        check_col += dc
 
     return True
 
 
 # ============================================================
-# 初始化关卡
+# 碰撞处理
 # ============================================================
 
-def load_level(level):
-    """
-    加载指定关卡
-    """
-
-    global arrows
-    global moving_arrows
-    global mistakes
-    global level_finished
-    global game_failed
-    global collision_effect
-
-    arrows = [
-        tuple(item)
-        for item in LEVEL_DATA[level]
-    ]
-
-    moving_arrows = []
-
-    mistakes = MAX_MISTAKES
-
-    level_finished = False
-    game_failed = False
-
-    collision_effect = None
-
-
-# ============================================================
-# 创建飞出箭头
-# ============================================================
-
-def create_flying_arrow(
-        row,
-        col,
-        direction,
-        index
+def trigger_collision(
+    row,
+    col
 ):
-    """
-    创建飞出动画
-    """
 
-    return {
-        "row": row,
-        "col": col,
-        "direction": direction,
-        "index": index,
-
-        "x": (
-            BOARD_X
-            + col * CELL_SIZE
-            + CELL_SIZE // 2
-        ),
-
-        "y": (
-            BOARD_Y
-            + row * CELL_SIZE
-            + CELL_SIZE // 2
-        ),
-
-        "speed": 14
-    }
-
-
-# ============================================================
-# 更新飞出动画
-# ============================================================
-
-def update_flying_arrows():
-    """
-    更新飞出中的箭头
-    """
-
-    for arrow in moving_arrows[:]:
-
-        direction = arrow["direction"]
-
-        speed = arrow["speed"]
-
-        if direction == "up":
-            arrow["y"] -= speed
-
-        elif direction == "down":
-            arrow["y"] += speed
-
-        elif direction == "left":
-            arrow["x"] -= speed
-
-        elif direction == "right":
-            arrow["x"] += speed
-
-        # 飞出屏幕后删除
-        if (
-            arrow["x"] < -100
-            or arrow["x"] > WIDTH + 100
-            or arrow["y"] < -100
-            or arrow["y"] > HEIGHT + 100
-        ):
-            moving_arrows.remove(arrow)
-
-
-def draw_flying_arrows():
-    """
-    绘制飞出动画
-    """
-
-    for arrow in moving_arrows:
-
-        direction = arrow["direction"]
-        index = arrow["index"]
-
-        color = get_arrow_color(index)
-
-        image = colorize_image(
-            DART_IMAGE,
-            color
-        )
-
-        angle = get_arrow_angle(
-            direction
-        )
-
-        rotated = pygame.transform.rotate(
-            image,
-            angle
-        )
-
-        rect = rotated.get_rect(
-            center=(
-                arrow["x"],
-                arrow["y"]
-            )
-        )
-
-        screen.blit(
-            rotated,
-            rect
-        )
-
-
-# ============================================================
-# 碰撞反馈
-# ============================================================
-
-def trigger_collision(row, col):
-    """
-    触发碰撞反馈
-    """
-
-    global collision_effect
     global mistakes
-    global game_failed
+    global collision_effect
 
-    # 错误次数 -1
     mistakes -= 1
 
-    # 保存碰撞箭头
     collision_effect = {
+
         "row": row,
+
         "col": col,
+
         "timer": COLLISION_DURATION
     }
 
-    # 错误次数耗尽
-    if mistakes <= 0:
-        mistakes = 0
-
 
 def update_collision_effect():
-    """
-    更新碰撞动画
-    """
 
     global collision_effect
 
@@ -576,43 +537,42 @@ def update_collision_effect():
     collision_effect["timer"] -= 1
 
     if collision_effect["timer"] <= 0:
+
         collision_effect = None
 
 
-def get_collision_shake():
-    """
-    获取箭头震动偏移
-    """
+def get_collision_shake(
+    row,
+    col
+):
 
     if collision_effect is None:
-        return 0, 0
+        return 0
+
+    if (
+        collision_effect["row"] != row
+        or
+        collision_effect["col"] != col
+    ):
+
+        return 0
 
     timer = collision_effect["timer"]
 
-    if timer <= 0:
-        return 0, 0
-
-    # 前 24 帧震动
-    if timer > 6:
-
-        if timer % 4 < 2:
-            return -6, 0
-
-        return 6, 0
-
-    return 0, 0
+    return int(
+        math.sin(timer * 1.8) * 7
+    )
 
 
 def draw_collision_effect():
-    """
-    绘制明显的碰撞反馈
-    """
 
     if collision_effect is None:
         return
 
     row = collision_effect["row"]
+
     col = collision_effect["col"]
+
     timer = collision_effect["timer"]
 
     x = (
@@ -625,39 +585,40 @@ def draw_collision_effect():
         + row * CELL_SIZE
     )
 
-    # =========================
-    # 1. 红色闪烁格子
-    # =========================
+    pygame.draw.rect(
+        screen,
+        RED,
+        (
+            x + 3,
+            y + 3,
+            CELL_SIZE - 6,
+            CELL_SIZE - 6
+        ),
+        width=4,
+        border_radius=8
+    )
 
-    # 闪烁效果
-    if timer % 6 < 4:
-
-        pygame.draw.rect(
-            screen,
-            (255, 70, 70),
-            (
-                x + 3,
-                y + 3,
-                CELL_SIZE - 6,
-                CELL_SIZE - 6
-            ),
-            width=5,
-            border_radius=8
-        )
-
-    # =========================
-    # 2. 半透明红色背景
-    # =========================
+    alpha = int(
+        80
+        * timer
+        / COLLISION_DURATION
+    )
 
     overlay = pygame.Surface(
-        (CELL_SIZE, CELL_SIZE),
+        (
+            CELL_SIZE,
+            CELL_SIZE
+        ),
         pygame.SRCALPHA
     )
 
-    alpha = 70
-
     overlay.fill(
-        (255, 60, 60, alpha)
+        (
+            255,
+            60,
+            60,
+            alpha
+        )
     )
 
     screen.blit(
@@ -665,151 +626,238 @@ def draw_collision_effect():
         (x, y)
     )
 
-    # =========================
-    # 3. 顶部警告文字
-    # =========================
 
-    if timer > 0:
+# ============================================================
+# 飞出动画
+# ============================================================
 
-        draw_text(
-            "前方有阻挡！",
-            font_big,
-            RED,
-            WIDTH // 2,
-            55
+def create_flying_arrow(
+    row,
+    col,
+    direction,
+    index
+):
+
+    center_x = (
+        BOARD_X
+        + col * CELL_SIZE
+        + CELL_SIZE // 2
+    )
+
+    center_y = (
+        BOARD_Y
+        + row * CELL_SIZE
+        + CELL_SIZE // 2
+    )
+
+    moving_arrows.append({
+
+        "x": center_x,
+
+        "y": center_y,
+
+        "direction": direction,
+
+        "index": index,
+
+        "speed": 15
+    })
+
+
+def update_flying_arrows():
+
+    for arrow in moving_arrows[:]:
+
+        direction = arrow["direction"]
+
+        if direction == "up":
+
+            arrow["y"] -= arrow["speed"]
+
+        elif direction == "down":
+
+            arrow["y"] += arrow["speed"]
+
+        elif direction == "left":
+
+            arrow["x"] -= arrow["speed"]
+
+        elif direction == "right":
+
+            arrow["x"] += arrow["speed"]
+
+        if (
+            arrow["x"] < -100
+            or
+            arrow["x"] > WIDTH + 100
+            or
+            arrow["y"] < -100
+            or
+            arrow["y"] > HEIGHT + 100
+        ):
+
+            moving_arrows.remove(
+                arrow
+            )
+
+
+def draw_flying_arrows():
+
+    for arrow in moving_arrows:
+
+        angle = get_arrow_angle(
+            arrow["direction"]
         )
 
-        draw_text(
-            "错误次数 -1",
-            font_normal,
-            RED,
-            WIDTH // 2,
-            85
+        image = pygame.transform.rotate(
+            dart_original,
+            angle
+        )
+
+        color = get_arrow_color(
+            arrow["index"]
+        )
+
+        color_surface = pygame.Surface(
+            image.get_size(),
+            pygame.SRCALPHA
+        )
+
+        color_surface.fill(
+            (*color, 255)
+        )
+
+        image = image.copy()
+
+        image.blit(
+            color_surface,
+            (0, 0),
+            special_flags=pygame.BLEND_RGBA_MULT
+        )
+
+        rect = image.get_rect(
+            center=(
+                arrow["x"],
+                arrow["y"]
+            )
+        )
+
+        screen.blit(
+            image,
+            rect
         )
 
 
 # ============================================================
-# 绘制棋盘
+# 加载关卡
 # ============================================================
 
-def draw_board():
-    """
-    绘制棋盘和箭头
-    """
+def load_level(level_number):
 
-    # 棋盘背景
-    board_rect = pygame.Rect(
-        BOARD_X,
-        BOARD_Y,
-        COLS * CELL_SIZE,
-        ROWS * CELL_SIZE
-    )
+    global arrows
+    global moving_arrows
+    global current_level
+    global mistakes
+    global level_finished
+    global game_failed
+    global all_levels_finished
+    global collision_effect
 
-    pygame.draw.rect(
-        screen,
-        BOARD_COLOR,
-        board_rect,
-        border_radius=8
-    )
+    current_level = level_number
 
-    # 网格
-    for row in range(ROWS):
+    arrows = []
 
-        for col in range(COLS):
+    moving_arrows = []
 
-            rect = pygame.Rect(
-                BOARD_X + col * CELL_SIZE,
-                BOARD_Y + row * CELL_SIZE,
-                CELL_SIZE,
-                CELL_SIZE
-            )
+    level_finished = False
 
-            pygame.draw.rect(
-                screen,
-                GRID_COLOR,
-                rect,
-                width=1
-            )
+    game_failed = False
 
-    # 绘制箭头
-    for index, arrow in enumerate(arrows):
+    all_levels_finished = False
 
-        row, col, direction = arrow
+    collision_effect = None
 
-        shake_x = 0
-        shake_y = 0
+    mistakes = LEVEL_MISTAKES[
+        current_level
+    ]
 
-        force_red = False
+    for index, data in enumerate(
+        LEVEL_DATA[current_level]
+    ):
 
-        # 当前正在碰撞的箭头
-        if collision_effect is not None:
+        row, col, direction = data
 
-            if (
-                collision_effect["row"] == row
-                and
-                collision_effect["col"] == col
-            ):
+        arrows.append({
 
-                shake_x, shake_y = (
-                    get_collision_shake()
-                )
+            "row": row,
 
-                force_red = True
+            "col": col,
 
-        draw_arrow(
-            row,
-            col,
-            direction,
-            index,
-            shake_x,
-            shake_y,
-            force_red
-        )
+            "direction": direction,
+
+            "index": index
+        })
 
 
 # ============================================================
 # 点击箭头
 # ============================================================
 
-def handle_arrow_click(mouse_pos):
-    """
-    处理玩家点击箭头
-    """
+def handle_arrow_click(
+    mouse_pos
+):
 
     global level_finished
-    global game_failed
 
-    # 如果正在碰撞反馈，不处理新的箭头点击
-    if collision_effect is not None:
-        return
+    mouse_x, mouse_y = mouse_pos
 
     clicked_arrow = None
-    clicked_index = -1
 
-    for index, arrow in enumerate(arrows):
+    for arrow in reversed(arrows):
 
-        row, col, direction = arrow
+        row = arrow["row"]
+
+        col = arrow["col"]
+
+        x = (
+            BOARD_X
+            + col * CELL_SIZE
+        )
+
+        y = (
+            BOARD_Y
+            + row * CELL_SIZE
+        )
 
         rect = pygame.Rect(
-            BOARD_X + col * CELL_SIZE,
-            BOARD_Y + row * CELL_SIZE,
+            x,
+            y,
             CELL_SIZE,
             CELL_SIZE
         )
 
-        if rect.collidepoint(mouse_pos):
+        if rect.collidepoint(
+            mouse_x,
+            mouse_y
+        ):
 
             clicked_arrow = arrow
-            clicked_index = index
+
             break
 
     if clicked_arrow is None:
         return
 
-    row, col, direction = clicked_arrow
+    row = clicked_arrow["row"]
+
+    col = clicked_arrow["col"]
+
+    direction = clicked_arrow["direction"]
+
+    index = clicked_arrow["index"]
 
     # ========================================================
-    # 情况一：前方没有阻挡
+    # 路径畅通
     # ========================================================
 
     if is_path_clear(
@@ -818,26 +866,23 @@ def handle_arrow_click(mouse_pos):
         direction
     ):
 
-        moving_arrow = create_flying_arrow(
+        create_flying_arrow(
             row,
             col,
             direction,
-            clicked_index
+            index
         )
 
-        moving_arrows.append(
-            moving_arrow
+        arrows.remove(
+            clicked_arrow
         )
 
-        # 从棋盘中删除
-        arrows.pop(clicked_index)
-
-        # 检查是否全部清除
         if len(arrows) == 0:
+
             level_finished = True
 
     # ========================================================
-    # 情况二：前方有阻挡
+    # 路径被阻挡
     # ========================================================
 
     else:
@@ -847,130 +892,263 @@ def handle_arrow_click(mouse_pos):
             col
         )
 
-        # 注意：
-        # 这里绝对不能 arrows.pop()
-        #
-        # 所以箭头会继续留在棋盘上
+
+# ============================================================
+# 绘制棋盘
+# ============================================================
+
+def draw_board():
+
+    board_rect = pygame.Rect(
+        BOARD_X,
+        BOARD_Y,
+        COLS * CELL_SIZE,
+        ROWS * CELL_SIZE
+    )
+
+    pygame.draw.rect(
+        screen,
+        (248, 249, 251),
+        board_rect,
+        border_radius=10
+    )
+
+    # 网格
+    for row in range(ROWS):
+
+        for col in range(COLS):
+
+            x = (
+                BOARD_X
+                + col * CELL_SIZE
+            )
+
+            y = (
+                BOARD_Y
+                + row * CELL_SIZE
+            )
+
+            pygame.draw.rect(
+                screen,
+                (220, 224, 230),
+                (
+                    x,
+                    y,
+                    CELL_SIZE,
+                    CELL_SIZE
+                ),
+                width=1
+            )
+
+    # 箭头
+    for index, arrow in enumerate(
+        arrows
+    ):
+
+        row = arrow["row"]
+
+        col = arrow["col"]
+
+        direction = arrow["direction"]
+
+        shake_x = get_collision_shake(
+            row,
+            col
+        )
+
+        draw_arrow(
+            row,
+            col,
+            direction,
+            index,
+            shake_x
+        )
+
+    draw_collision_effect()
 
 
 # ============================================================
-# 画开始界面
+# 开始界面
 # ============================================================
 
 def draw_start_screen():
 
-    screen.fill(WHITE)
+    screen.fill(
+        (242, 245, 249)
+    )
 
     draw_text(
-        "一箭又一箭",
+        "一镖又一镖",
         font_title,
         DARK_GRAY,
-        WIDTH // 2,
-        120
+        (
+            WIDTH // 2,
+            110
+        )
     )
 
     draw_text(
-        "箭头解谜小游戏",
+        "方向飞镖消除小游戏",
         font_normal,
         GRAY,
-        WIDTH // 2,
-        170
+        (
+            WIDTH // 2,
+            175
+        )
     )
 
-    # 游戏规则
+    # 规则框
     rule_rect = pygame.Rect(
-        250,
-        365,
-        500,
-        120
+        220,
+        230,
+        560,
+        135
     )
 
     pygame.draw.rect(
         screen,
-        LIGHT_BLUE,
+        WHITE,
         rule_rect,
-        border_radius=12
+        border_radius=14
     )
 
     pygame.draw.rect(
         screen,
-        BLUE,
+        (210, 215, 220),
         rule_rect,
         width=2,
-        border_radius=12
+        border_radius=14
     )
 
     draw_text(
         "游戏规则",
         font_medium,
-        BLUE,
-        WIDTH // 2,
-        390
+        DARK_GRAY,
+        (
+            WIDTH // 2,
+            260
+        )
     )
 
     draw_text(
-        "点击箭头，若前方没有阻挡，箭头即可飞出",
+        "点击飞镖，前方没有其他飞镖即可飞出",
         font_small,
-        DARK_GRAY,
-        WIDTH // 2,
-        425
+        GRAY,
+        (
+            WIDTH // 2,
+            305
+        )
     )
 
     draw_text(
-        "若前方有其他箭头，则无法飞出并扣除一次错误",
+        "如果前方有阻挡，则消耗一次失误机会",
         font_small,
-        DARK_GRAY,
-        WIDTH // 2,
-        455
+        GRAY,
+        (
+            WIDTH // 2,
+            340
+        )
     )
 
     draw_button(
         start_button_rect,
         "进入游戏",
+        font_medium,
         BLUE
     )
 
 
 # ============================================================
-# 选关界面
+# 关卡选择
 # ============================================================
 
 def draw_level_select_screen():
 
-    screen.fill(WHITE)
+    screen.fill(
+        (242, 245, 249)
+    )
 
     draw_text(
         "选择关卡",
         font_title,
         DARK_GRAY,
-        WIDTH // 2,
-        120
-    )
-
-    draw_text(
-        "请选择一个关卡开始游戏",
-        font_normal,
-        GRAY,
-        WIDTH // 2,
-        175
-    )
-
-    for i, rect in enumerate(
-        level_button_rects
-    ):
-
-        draw_button(
-            rect,
-            f"第 {i + 1} 关",
-            BLUE
+        (
+            WIDTH // 2,
+            85
         )
+    )
 
     draw_text(
-        "共 3 个关卡",
+        f"当前已解锁：1 - {unlocked_level} 关",
         font_small,
         GRAY,
-        WIDTH // 2,
-        390
+        (
+            WIDTH // 2,
+            150
+        )
+    )
+
+    # 三个关卡
+    for i in range(3):
+
+        level_number = i + 1
+
+        rect = level_button_rects[i]
+
+        # 已解锁
+        if level_number <= unlocked_level:
+
+            if level_number == current_level:
+                button_color = GREEN
+            else:
+                button_color = BLUE
+
+            draw_button(
+                rect,
+                f"第 {level_number} 关",
+                font_medium,
+                button_color
+            )
+
+            draw_text(
+                f"允许失误 {LEVEL_MISTAKES[level_number]} 次",
+                font_small,
+                DARK_GRAY,
+                (
+                    rect.centerx,
+                    375
+                )
+            )
+
+        # 未解锁
+        else:
+
+            draw_button(
+                rect,
+                "未解锁",
+                font_medium,
+                LOCK_GRAY
+            )
+
+            draw_text(
+                "完成上一关解锁",
+                font_small,
+                GRAY,
+                (
+                    rect.centerx,
+                    375
+                )
+            )
+
+    # 底部提示
+    draw_text(
+        "完成当前关卡后即可解锁下一关",
+        font_small,
+        GRAY,
+        (
+            WIDTH // 2,
+            500
+        )
     )
 
 
@@ -980,105 +1158,210 @@ def draw_level_select_screen():
 
 def draw_game_screen():
 
-    screen.fill(WHITE)
+    screen.fill(
+        (242, 245, 249)
+    )
 
-    # 标题
+    # ========================================================
+    # 顶部
+    # ========================================================
+
     draw_text(
         f"第 {current_level} 关",
         font_big,
         DARK_GRAY,
-        WIDTH // 2,
-        45
+        (
+            WIDTH // 2,
+            45
+        )
     )
 
-    # 剩余箭头
+    # ========================================================
+    # 左侧信息
+    # ========================================================
+
+    info_x = 120
+
     draw_text(
-        f"剩余箭头：{len(arrows)}",
+        "关卡信息",
+        font_medium,
+        DARK_GRAY,
+        (
+            info_x,
+            135
+        )
+    )
+
+    draw_text(
+        f"剩余飞镖：{len(arrows)}",
         font_normal,
         DARK_GRAY,
-        120,
-        125
-    )
-
-    # 错误次数
-    mistakes_color = (
-        RED if mistakes == 1
-        else DARK_GRAY
+        (
+            info_x,
+            190
+        )
     )
 
     draw_text(
-        f"剩余错误次数：{mistakes}",
+        f"剩余失误：{mistakes}",
         font_normal,
-        mistakes_color,
-        125,
-        165
+        RED,
+        (
+            info_x,
+            245
+        )
     )
 
-    # 棋盘
-    draw_board()
+    draw_text(
+        f"本关允许：{LEVEL_MISTAKES[current_level]} 次",
+        font_small,
+        GRAY,
+        (
+            info_x,
+            290
+        )
+    )
 
-    # 游戏中的重新开始按钮
+    # 分割线
+    pygame.draw.line(
+        screen,
+        (210, 215, 220),
+        (45, 330),
+        (205, 330),
+        width=2
+    )
+
+    draw_text(
+        "操作说明",
+        font_medium,
+        DARK_GRAY,
+        (
+            info_x,
+            370
+        )
+    )
+
+    draw_text(
+        "点击飞镖",
+        font_small,
+        GRAY,
+        (
+            info_x,
+            415
+        )
+    )
+
+    draw_text(
+        "让飞镖向前飞出",
+        font_small,
+        GRAY,
+        (
+            info_x,
+            450
+        )
+    )
+
+    # ========================================================
+    # 重新开始
+    # ========================================================
+
     draw_button(
         restart_game_button_rect,
         "重新开始",
+        font_small,
         BLUE
     )
 
-    # 操作提示
-    draw_text(
-        "点击箭头使其飞出",
-        font_small,
-        GRAY,
-        855,
-        455
-    )
+    # ========================================================
+    # 棋盘
+    # ========================================================
 
-    # 碰撞反馈
-    draw_collision_effect()
+    draw_board()
 
-    # 飞出动画
+    # 飞行箭头
     draw_flying_arrows()
+
+    # ========================================================
+    # 碰撞提示
+    # ========================================================
+
+    if collision_effect is not None:
+
+        draw_text(
+            "前方有阻挡！",
+            font_medium,
+            RED,
+            (
+                WIDTH // 2,
+                650
+            )
+        )
 
 
 # ============================================================
-# 关卡完成界面
+# 通关界面
 # ============================================================
 
 def draw_level_finished_screen():
 
-    screen.fill(WHITE)
-
-    draw_text(
-        "关卡完成！",
-        font_title,
-        GREEN,
-        WIDTH // 2,
-        170
+    screen.fill(
+        (242, 245, 249)
     )
 
     draw_text(
-        f"第 {current_level} 关已成功通关",
+        "恭喜通关！",
+        font_title,
+        GREEN,
+        (
+            WIDTH // 2,
+            135
+        )
+    )
+
+    draw_text(
+        f"第 {current_level} 关完成",
         font_medium,
         DARK_GRAY,
-        WIDTH // 2,
-        235
+        (
+            WIDTH // 2,
+            215
+        )
+    )
+
+    draw_text(
+        f"剩余失误次数：{mistakes}",
+        font_normal,
+        GRAY,
+        (
+            WIDTH // 2,
+            270
+        )
     )
 
     if current_level < 3:
 
         draw_button(
-            back_select_button_rect,
-            "进入下一关",
+            next_level_button_rect,
+            f"进入第 {current_level + 1} 关",
+            font_medium,
             GREEN
         )
 
     else:
 
         draw_button(
-            back_select_button_rect,
-            "查看通关结果",
+            next_level_button_rect,
+            "完成全部关卡",
+            font_medium,
             GREEN
         )
+
+    draw_button(
+        back_select_button_rect,
+        "返回关卡选择",
+        font_normal,
+        BLUE
+    )
 
 
 # ============================================================
@@ -1087,34 +1370,52 @@ def draw_level_finished_screen():
 
 def draw_failed_screen():
 
-    screen.fill(WHITE)
+    screen.fill(
+        (250, 242, 242)
+    )
 
     draw_text(
         "挑战失败",
         font_title,
         RED,
-        WIDTH // 2,
-        170
+        (
+            WIDTH // 2,
+            135
+        )
     )
 
     draw_text(
-        "错误次数已经用完",
+        "失误次数已经用完",
         font_medium,
         DARK_GRAY,
-        WIDTH // 2,
-        235
+        (
+            WIDTH // 2,
+            215
+        )
+    )
+
+    draw_text(
+        f"当前为第 {current_level} 关",
+        font_normal,
+        GRAY,
+        (
+            WIDTH // 2,
+            270
+        )
     )
 
     draw_button(
         restart_button_rect,
         "重新挑战",
-        BLUE
+        font_medium,
+        RED
     )
 
     draw_button(
         back_select_button_rect,
-        "返回选关",
-        DARK_GRAY
+        "返回关卡选择",
+        font_normal,
+        BLUE
     )
 
 
@@ -1124,51 +1425,58 @@ def draw_failed_screen():
 
 def draw_all_finished_screen():
 
-    screen.fill(WHITE)
+    screen.fill(
+        (242, 245, 249)
+    )
 
     draw_text(
-        "恭喜通关！",
+        "全部通关！",
         font_title,
         GREEN,
-        WIDTH // 2,
-        170
+        (
+            WIDTH // 2,
+            145
+        )
     )
 
     draw_text(
-        "你已经完成全部 3 个关卡",
+        "恭喜你完成了全部三个关卡",
         font_medium,
         DARK_GRAY,
-        WIDTH // 2,
-        235
+        (
+            WIDTH // 2,
+            235
+        )
     )
 
-    draw_button(
-        restart_button_rect,
-        "重新开始",
-        BLUE
+    draw_text(
+        "你可以返回关卡选择重新挑战",
+        font_normal,
+        GRAY,
+        (
+            WIDTH // 2,
+            295
+        )
     )
 
     draw_button(
         back_select_button_rect,
-        "返回选关",
-        DARK_GRAY
+        "返回关卡选择",
+        font_medium,
+        BLUE
     )
 
 
 # ============================================================
-# 主程序
+# 主循环
 # ============================================================
-
-load_level(1)
 
 running = True
 
 while running:
 
-    clock.tick(60)
-
     # ========================================================
-    # 事件处理
+    # 事件
     # ========================================================
 
     for event in pygame.event.get():
@@ -1177,57 +1485,65 @@ while running:
 
             running = False
 
-        # ====================================================
-        # 鼠标点击
-        # ====================================================
-
         elif event.type == pygame.MOUSEBUTTONDOWN:
-
-            if event.button != 1:
-                continue
 
             mouse_pos = event.pos
 
-            # ================================================
+            # =================================================
             # 开始界面
-            # ================================================
+            # =================================================
 
-            if not game_started:
+            if (
+                not game_started
+                and
+                not level_selecting
+            ):
 
                 if start_button_rect.collidepoint(
                     mouse_pos
                 ):
 
                     game_started = True
+
                     level_selecting = True
 
-            # ================================================
-            # 选关界面
-            # ================================================
+            # =================================================
+            # 关卡选择
+            # =================================================
 
-            elif level_selecting:
+            elif (
+                game_started
+                and
+                level_selecting
+            ):
 
                 for i, rect in enumerate(
                     level_button_rects
                 ):
 
-                    if rect.collidepoint(
-                        mouse_pos
+                    level_number = i + 1
+
+                    if (
+                        level_number <= unlocked_level
+                        and
+                        rect.collidepoint(
+                            mouse_pos
+                        )
                     ):
 
-                        current_level = i + 1
-
                         load_level(
-                            current_level
+                            level_number
                         )
 
                         level_selecting = False
 
+                        game_started = True
+
                         break
 
-            # ================================================
-            # 游戏失败
-            # ================================================
+            # =================================================
+            # 失败界面
+            # =================================================
 
             elif game_failed:
 
@@ -1239,87 +1555,77 @@ while running:
                         current_level
                     )
 
-                    continue
-
-                if back_select_button_rect.collidepoint(
+                elif back_select_button_rect.collidepoint(
                     mouse_pos
                 ):
 
-                    level_selecting = True
                     game_failed = False
 
-                    continue
+                    level_selecting = True
 
-            # ================================================
+            # =================================================
             # 全部通关
-            # ================================================
+            # =================================================
 
             elif all_levels_finished:
 
-                if restart_button_rect.collidepoint(
-                    mouse_pos
-                ):
-
-                    current_level = 1
-
-                    load_level(
-                        current_level
-                    )
-
-                    all_levels_finished = False
-                    level_selecting = False
-                    game_started = True
-
-                    continue
-
                 if back_select_button_rect.collidepoint(
                     mouse_pos
                 ):
 
-                    current_level = 1
-
-                    load_level(
-                        current_level
-                    )
-
                     all_levels_finished = False
+
                     level_selecting = True
-                    game_started = True
 
-                    continue
-
-            # ================================================
-            # 关卡完成
-            # ================================================
+            # =================================================
+            # 当前关卡通关
+            # =================================================
 
             elif level_finished:
 
-                if back_select_button_rect.collidepoint(
+                # 下一关
+                if next_level_button_rect.collidepoint(
                     mouse_pos
                 ):
 
                     if current_level < 3:
 
-                        current_level += 1
-
-                        load_level(
-                            current_level
+                        next_level = (
+                            current_level + 1
                         )
 
-                        level_finished = False
+                        # 解锁下一关
+                        unlocked_level = max(
+                            unlocked_level,
+                            next_level
+                        )
+
+                        load_level(
+                            next_level
+                        )
 
                     else:
 
                         level_finished = False
+
                         all_levels_finished = True
 
-            # ================================================
+                # 返回关卡选择
+                elif back_select_button_rect.collidepoint(
+                    mouse_pos
+                ):
+
+                    level_finished = False
+
+                    level_selecting = True
+
+            # =================================================
             # 正常游戏
-            # ================================================
+            # =================================================
 
-            else:
+            elif game_started:
 
-                # 游戏中的重新开始
+                # 重新开始当前关卡
                 if restart_game_button_rect.collidepoint(
                     mouse_pos
                 ):
@@ -1328,56 +1634,85 @@ while running:
                         current_level
                     )
 
-                    continue
+                else:
 
-                # 点击箭头
-                handle_arrow_click(
-                    mouse_pos
-                )
+                    handle_arrow_click(
+                        mouse_pos
+                    )
 
-                # 错误次数耗尽
-                if mistakes <= 0:
+                    # 失误次数耗尽
+                    if mistakes <= 0:
 
-                    game_failed = True
+                        game_failed = True
+
+                        collision_effect = None
+
 
     # ========================================================
     # 更新
     # ========================================================
 
-    update_flying_arrows()
+    if (
+        game_started
+        and
+        not level_selecting
+        and
+        not game_failed
+        and
+        not all_levels_finished
+    ):
 
-    update_collision_effect()
+        update_flying_arrows()
+
+        update_collision_effect()
+
 
     # ========================================================
     # 绘制
     # ========================================================
 
-    if not game_started:
+    if (
+        not game_started
+        and
+        not level_selecting
+    ):
 
         draw_start_screen()
 
-    elif level_selecting:
+    elif (
+        game_started
+        and
+        level_selecting
+    ):
 
         draw_level_select_screen()
-
-    elif game_failed:
-
-        draw_failed_screen()
 
     elif all_levels_finished:
 
         draw_all_finished_screen()
 
+    elif game_failed:
+
+        draw_failed_screen()
+
     elif level_finished:
 
         draw_level_finished_screen()
 
-    else:
+    elif game_started:
 
         draw_game_screen()
 
+
     pygame.display.flip()
 
+    clock.tick(60)
+
+
+# ============================================================
+# 退出
+# ============================================================
 
 pygame.quit()
+
 sys.exit()
