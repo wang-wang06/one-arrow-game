@@ -1,0 +1,50 @@
+{
+    "current_level": 2,
+    "unlocked_level": 2,
+    "mistakes": 3,
+    "score": 150,
+    "elapsed_time": 7.632978916168213,
+    "final_time": 0,
+    "final_mistakes_used": 0,
+    "current_stars": 0,
+    "level_finished": false,
+    "game_failed": false,
+    "arrows": [
+        {
+            "row": 3,
+            "col": 2,
+            "direction": "right",
+            "index": 2
+        },
+        {
+            "row": 6,
+            "col": 2,
+            "direction": "up",
+            "index": 3
+        },
+        {
+            "row": 6,
+            "col": 5,
+            "direction": "left",
+            "index": 4
+        },
+        {
+            "row": 2,
+            "col": 5,
+            "direction": "down",
+            "index": 5
+        },
+        {
+            "row": 2,
+            "col": 1,
+            "direction": "right",
+            "index": 6
+        },
+        {
+            "row": 5,
+            "col": 1,
+            "direction": "up",
+            "index": 7
+        }
+    ]
+}
