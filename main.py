@@ -2,6 +2,7 @@ import pygame
 import sys
 import math
 import os
+import time
 
 pygame.init()
 
@@ -65,12 +66,14 @@ if FONT_PATH:
     font_medium = pygame.font.Font(FONT_PATH, 32)
     font_normal = pygame.font.Font(FONT_PATH, 25)
     font_small = pygame.font.Font(FONT_PATH, 20)
+    font_score = pygame.font.Font(FONT_PATH, 23)
 else:
     font_title = pygame.font.SysFont("simhei", 58)
     font_big = pygame.font.SysFont("simhei", 42)
     font_medium = pygame.font.SysFont("simhei", 32)
     font_normal = pygame.font.SysFont("simhei", 25)
     font_small = pygame.font.SysFont("simhei", 20)
+    font_score = pygame.font.SysFont("simhei", 23)
 
 
 # ============================================================
@@ -162,6 +165,32 @@ LEVEL_MISTAKES = {
 
 
 # ============================================================
+# 计分设置
+# ============================================================
+
+SCORE_PER_ARROW = 100
+
+MISTAKE_PENALTY = 50
+
+MIN_SCORE = 0
+
+
+# ============================================================
+# 星级评价
+# ============================================================
+
+def calculate_stars(elapsed_time, mistakes_used):
+
+    if elapsed_time <= 20 and mistakes_used <= 1:
+        return 3
+
+    if elapsed_time <= 35 and mistakes_used <= 3:
+        return 2
+
+    return 1
+
+
+# ============================================================
 # 游戏状态
 # ============================================================
 
@@ -176,10 +205,8 @@ game_failed = False
 all_levels_finished = False
 
 
-# 当前关卡
 current_level = 1
 
-# 当前已经解锁到第几关
 unlocked_level = 1
 
 
@@ -200,6 +227,21 @@ mistakes = LEVEL_MISTAKES[current_level]
 
 
 # ============================================================
+# 得分
+# ============================================================
+
+score = 0
+
+level_start_time = None
+
+final_time = 0
+
+final_mistakes_used = 0
+
+current_stars = 0
+
+
+# ============================================================
 # 碰撞反馈
 # ============================================================
 
@@ -217,7 +259,7 @@ start_button_rect = pygame.Rect(
     350,
     430,
     300,
-    75
+    70
 )
 
 
@@ -259,16 +301,16 @@ restart_game_button_rect = pygame.Rect(
 # 通关后进入下一关
 next_level_button_rect = pygame.Rect(
     350,
-    350,
+    415,
     300,
-    70
+    65
 )
 
 
 # 返回关卡选择
 back_select_button_rect = pygame.Rect(
     350,
-    455,
+    500,
     300,
     60
 )
@@ -277,9 +319,9 @@ back_select_button_rect = pygame.Rect(
 # 失败后重新挑战
 restart_button_rect = pygame.Rect(
     350,
-    350,
+    390,
     300,
-    70
+    65
 )
 
 
@@ -337,12 +379,43 @@ def draw_button(
 
 
 # ============================================================
+# 格式化时间
+# ============================================================
+
+def format_time(seconds):
+
+    seconds = max(
+        0,
+        int(seconds)
+    )
+
+    minutes = seconds // 60
+
+    remain_seconds = seconds % 60
+
+    return f"{minutes:02d}:{remain_seconds:02d}"
+
+
+# ============================================================
+# 获取当前计时
+# ============================================================
+
+def get_current_elapsed_time():
+
+    if level_start_time is None:
+        return 0
+
+    if level_finished or game_failed:
+        return final_time
+
+    return time.time() - level_start_time
+
+
+# ============================================================
 # 箭头角度
 # ============================================================
 
 def get_arrow_angle(direction):
-
-    # dart.png 原始尖端方向为 ↙
 
     angle_map = {
 
@@ -514,8 +587,14 @@ def trigger_collision(
 
     global mistakes
     global collision_effect
+    global score
 
     mistakes -= 1
+
+    score = max(
+        MIN_SCORE,
+        score - MISTAKE_PENALTY
+    )
 
     collision_effect = {
 
@@ -671,19 +750,15 @@ def update_flying_arrows():
         direction = arrow["direction"]
 
         if direction == "up":
-
             arrow["y"] -= arrow["speed"]
 
         elif direction == "down":
-
             arrow["y"] += arrow["speed"]
 
         elif direction == "left":
-
             arrow["x"] -= arrow["speed"]
 
         elif direction == "right":
-
             arrow["x"] += arrow["speed"]
 
         if (
@@ -763,6 +838,12 @@ def load_level(level_number):
     global all_levels_finished
     global collision_effect
 
+    global score
+    global level_start_time
+    global final_time
+    global final_mistakes_used
+    global current_stars
+
     current_level = level_number
 
     arrows = []
@@ -780,6 +861,16 @@ def load_level(level_number):
     mistakes = LEVEL_MISTAKES[
         current_level
     ]
+
+    score = 0
+
+    level_start_time = time.time()
+
+    final_time = 0
+
+    final_mistakes_used = 0
+
+    current_stars = 0
 
     for index, data in enumerate(
         LEVEL_DATA[current_level]
@@ -800,6 +891,48 @@ def load_level(level_number):
 
 
 # ============================================================
+# 计算通关结果
+# ============================================================
+
+def finish_level():
+
+    global level_finished
+    global final_time
+    global final_mistakes_used
+    global current_stars
+    global score
+
+    level_finished = True
+
+    final_time = (
+        time.time()
+        - level_start_time
+    )
+
+    final_mistakes_used = (
+        LEVEL_MISTAKES[current_level]
+        - mistakes
+    )
+
+    current_stars = calculate_stars(
+        final_time,
+        final_mistakes_used
+    )
+
+    if current_stars == 3:
+
+        score += 300
+
+    elif current_stars == 2:
+
+        score += 150
+
+    elif current_stars == 1:
+
+        score += 50
+
+
+# ============================================================
 # 点击箭头
 # ============================================================
 
@@ -807,7 +940,7 @@ def handle_arrow_click(
     mouse_pos
 ):
 
-    global level_finished
+    global score
 
     mouse_x, mouse_y = mouse_pos
 
@@ -856,15 +989,13 @@ def handle_arrow_click(
 
     index = clicked_arrow["index"]
 
-    # ========================================================
-    # 路径畅通
-    # ========================================================
-
     if is_path_clear(
         row,
         col,
         direction
     ):
+
+        score += SCORE_PER_ARROW
 
         create_flying_arrow(
             row,
@@ -879,11 +1010,7 @@ def handle_arrow_click(
 
         if len(arrows) == 0:
 
-            level_finished = True
-
-    # ========================================================
-    # 路径被阻挡
-    # ========================================================
+            finish_level()
 
     else:
 
@@ -913,7 +1040,6 @@ def draw_board():
         border_radius=10
     )
 
-    # 网格
     for row in range(ROWS):
 
         for col in range(COLS):
@@ -940,7 +1066,6 @@ def draw_board():
                 width=1
             )
 
-    # 箭头
     for index, arrow in enumerate(
         arrows
     ):
@@ -978,12 +1103,12 @@ def draw_start_screen():
     )
 
     draw_text(
-        "一镖又一镖",
+        "一箭又一箭",
         font_title,
         DARK_GRAY,
         (
             WIDTH // 2,
-            110
+            100
         )
     )
 
@@ -993,16 +1118,16 @@ def draw_start_screen():
         GRAY,
         (
             WIDTH // 2,
-            175
+            165
         )
     )
 
     # 规则框
     rule_rect = pygame.Rect(
         220,
-        230,
+        225,
         560,
-        135
+        145
     )
 
     pygame.draw.rect(
@@ -1026,7 +1151,7 @@ def draw_start_screen():
         DARK_GRAY,
         (
             WIDTH // 2,
-            260
+            255
         )
     )
 
@@ -1046,7 +1171,7 @@ def draw_start_screen():
         GRAY,
         (
             WIDTH // 2,
-            340
+            345
         )
     )
 
@@ -1088,14 +1213,12 @@ def draw_level_select_screen():
         )
     )
 
-    # 三个关卡
     for i in range(3):
 
         level_number = i + 1
 
         rect = level_button_rects[i]
 
-        # 已解锁
         if level_number <= unlocked_level:
 
             if level_number == current_level:
@@ -1120,7 +1243,6 @@ def draw_level_select_screen():
                 )
             )
 
-        # 未解锁
         else:
 
             draw_button(
@@ -1140,7 +1262,6 @@ def draw_level_select_screen():
                 )
             )
 
-    # 底部提示
     draw_text(
         "完成当前关卡后即可解锁下一关",
         font_small,
@@ -1163,7 +1284,7 @@ def draw_game_screen():
     )
 
     # ========================================================
-    # 顶部
+    # 顶部标题
     # ========================================================
 
     draw_text(
@@ -1172,12 +1293,12 @@ def draw_game_screen():
         DARK_GRAY,
         (
             WIDTH // 2,
-            45
+            42
         )
     )
 
     # ========================================================
-    # 左侧信息
+    # 左侧信息区域
     # ========================================================
 
     info_x = 120
@@ -1188,41 +1309,52 @@ def draw_game_screen():
         DARK_GRAY,
         (
             info_x,
-            135
+            125
+        )
+    )
+
+    draw_text(
+        f"得分：{score}",
+        font_score,
+        BLUE,
+        (
+            info_x,
+            175
+        )
+    )
+
+    elapsed_time = get_current_elapsed_time()
+
+    draw_text(
+        f"时间：{format_time(elapsed_time)}",
+        font_score,
+        DARK_GRAY,
+        (
+            info_x,
+            215
         )
     )
 
     draw_text(
         f"剩余飞镖：{len(arrows)}",
-        font_normal,
+        font_score,
         DARK_GRAY,
         (
             info_x,
-            190
+            255
         )
     )
 
     draw_text(
         f"剩余失误：{mistakes}",
-        font_normal,
+        font_score,
         RED,
         (
             info_x,
-            245
+            295
         )
     )
 
-    draw_text(
-        f"本关允许：{LEVEL_MISTAKES[current_level]} 次",
-        font_small,
-        GRAY,
-        (
-            info_x,
-            290
-        )
-    )
-
-    # 分割线
     pygame.draw.line(
         screen,
         (210, 215, 220),
@@ -1278,7 +1410,6 @@ def draw_game_screen():
 
     draw_board()
 
-    # 飞行箭头
     draw_flying_arrows()
 
     # ========================================================
@@ -1299,6 +1430,89 @@ def draw_game_screen():
 
 
 # ============================================================
+# 绘制三星评价
+# ============================================================
+
+def draw_stars(
+    stars,
+    center_x,
+    center_y
+):
+
+    star_size = 42
+
+    gap = 25
+
+    total_width = (
+        3 * star_size
+        + 2 * gap
+    )
+
+    start_x = (
+        center_x
+        - total_width // 2
+        + star_size // 2
+    )
+
+    for i in range(3):
+
+        x = (
+            start_x
+            + i * (
+                star_size + gap
+            )
+        )
+
+        if i < stars:
+            color = YELLOW
+        else:
+            color = (210, 210, 210)
+
+        points = []
+
+        for j in range(10):
+
+            angle = (
+                -math.pi / 2
+                + j * math.pi / 5
+            )
+
+            if j % 2 == 0:
+                radius = star_size / 2
+            else:
+                radius = star_size / 4
+
+            px = (
+                x
+                + math.cos(angle)
+                * radius
+            )
+
+            py = (
+                center_y
+                + math.sin(angle)
+                * radius
+            )
+
+            points.append(
+                (px, py)
+            )
+
+        pygame.draw.polygon(
+            screen,
+            color,
+            points
+        )
+
+        pygame.draw.polygon(
+            screen,
+            DARK_GRAY,
+            points,
+            width=1
+        )
+
+
+# ============================================================
 # 通关界面
 # ============================================================
 
@@ -1308,13 +1522,14 @@ def draw_level_finished_screen():
         (242, 245, 249)
     )
 
+    # 标题
     draw_text(
         "恭喜通关！",
         font_title,
         GREEN,
         (
             WIDTH // 2,
-            135
+            75
         )
     )
 
@@ -1324,19 +1539,79 @@ def draw_level_finished_screen():
         DARK_GRAY,
         (
             WIDTH // 2,
-            215
+            135
+        )
+    )
+
+    # ========================================================
+    # 星级
+    # ========================================================
+
+    draw_stars(
+        current_stars,
+        WIDTH // 2,
+        200
+    )
+
+    draw_text(
+        f"{current_stars} 星评价",
+        font_normal,
+        YELLOW,
+        (
+            WIDTH // 2,
+            250
+        )
+    )
+
+    # ========================================================
+    # 成绩信息框
+    # ========================================================
+
+    result_rect = pygame.Rect(
+        320,
+        280,
+        360,
+        110
+    )
+
+    pygame.draw.rect(
+        screen,
+        WHITE,
+        result_rect,
+        border_radius=12
+    )
+
+    pygame.draw.rect(
+        screen,
+        (215, 220, 225),
+        result_rect,
+        width=2,
+        border_radius=12
+    )
+
+    draw_text(
+        f"最终得分：{score}",
+        font_normal,
+        BLUE,
+        (
+            WIDTH // 2,
+            315
         )
     )
 
     draw_text(
-        f"剩余失误次数：{mistakes}",
-        font_normal,
-        GRAY,
+        f"完成时间：{format_time(final_time)}",
+        font_small,
+        DARK_GRAY,
         (
             WIDTH // 2,
-            270
+            360
         )
     )
+
+    # ========================================================
+    # 下一关按钮
+    # ========================================================
 
     if current_level < 3:
 
@@ -1355,6 +1630,10 @@ def draw_level_finished_screen():
             font_medium,
             GREEN
         )
+
+    # ========================================================
+    # 返回按钮
+    # ========================================================
 
     draw_button(
         back_select_button_rect,
@@ -1380,7 +1659,7 @@ def draw_failed_screen():
         RED,
         (
             WIDTH // 2,
-            135
+            115
         )
     )
 
@@ -1390,20 +1669,54 @@ def draw_failed_screen():
         DARK_GRAY,
         (
             WIDTH // 2,
-            215
+            190
         )
+    )
+
+    # 信息框
+    fail_rect = pygame.Rect(
+        320,
+        235,
+        360,
+        105
+    )
+
+    pygame.draw.rect(
+        screen,
+        WHITE,
+        fail_rect,
+        border_radius=12
+    )
+
+    pygame.draw.rect(
+        screen,
+        (225, 210, 210),
+        fail_rect,
+        width=2,
+        border_radius=12
     )
 
     draw_text(
         f"当前为第 {current_level} 关",
         font_normal,
-        GRAY,
+        DARK_GRAY,
         (
             WIDTH // 2,
             270
         )
     )
 
+    draw_text(
+        f"当前得分：{score}",
+        font_small,
+        BLUE,
+        (
+            WIDTH // 2,
+            315
+        )
+    )
+
+    # 重新挑战
     draw_button(
         restart_button_rect,
         "重新挑战",
@@ -1411,6 +1724,7 @@ def draw_failed_screen():
         RED
     )
 
+    # 返回关卡选择
     draw_button(
         back_select_button_rect,
         "返回关卡选择",
@@ -1435,7 +1749,7 @@ def draw_all_finished_screen():
         GREEN,
         (
             WIDTH // 2,
-            145
+            125
         )
     )
 
@@ -1445,7 +1759,7 @@ def draw_all_finished_screen():
         DARK_GRAY,
         (
             WIDTH // 2,
-            235
+            215
         )
     )
 
@@ -1455,7 +1769,7 @@ def draw_all_finished_screen():
         GRAY,
         (
             WIDTH // 2,
-            295
+            275
         )
     )
 
@@ -1583,7 +1897,6 @@ while running:
 
             elif level_finished:
 
-                # 下一关
                 if next_level_button_rect.collidepoint(
                     mouse_pos
                 ):
@@ -1594,7 +1907,6 @@ while running:
                             current_level + 1
                         )
 
-                        # 解锁下一关
                         unlocked_level = max(
                             unlocked_level,
                             next_level
@@ -1610,7 +1922,6 @@ while running:
 
                         all_levels_finished = True
 
-                # 返回关卡选择
                 elif back_select_button_rect.collidepoint(
                     mouse_pos
                 ):
@@ -1625,7 +1936,6 @@ while running:
 
             elif game_started:
 
-                # 重新开始当前关卡
                 if restart_game_button_rect.collidepoint(
                     mouse_pos
                 ):
@@ -1640,13 +1950,16 @@ while running:
                         mouse_pos
                     )
 
-                    # 失误次数耗尽
                     if mistakes <= 0:
+
+                        final_time = (
+                            time.time()
+                            - level_start_time
+                        )
 
                         game_failed = True
 
                         collision_effect = None
-
 
     # ========================================================
     # 更新
@@ -1664,8 +1977,8 @@ while running:
 
         update_flying_arrows()
 
-        update_collision_effect()
-
+        if not level_finished:
+            update_collision_effect()
 
     # ========================================================
     # 绘制
@@ -1702,7 +2015,6 @@ while running:
     elif game_started:
 
         draw_game_screen()
-
 
     pygame.display.flip()
 
