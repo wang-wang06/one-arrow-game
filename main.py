@@ -82,21 +82,30 @@ ARROW_COLORS = [
     (255, 140, 210),   # 极光粉
 ]
 
-# ============================================================
+
 # 中文字体
 # ============================================================
 
-FONT_PATHS = [
+# 使用相对路径加载字体文件
+FONT_PATH = os.path.join("assets", "simhei.ttf")
+
+# 备用字体路径（防止 assets 下忘记放字体导致直接崩溃，仅供容错）
+FALLBACK_FONT_PATHS = [
     "C:/Windows/Fonts/msyh.ttc",
     "C:/Windows/Fonts/simhei.ttf",
     "C:/Windows/Fonts/simsun.ttc",
+    "/System/Library/Fonts/PingFang.ttc",  # macOS 备用
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"  # Linux 备用
 ]
 
-FONT_PATH = None
-for p in FONT_PATHS:
-    if os.path.exists(p):
-        FONT_PATH = p
-        break
+# 检查 assets 下的字体是否存在
+if not os.path.exists(FONT_PATH):
+    print(f"警告：未找到 {FONT_PATH}，尝试使用系统字体...")
+    FONT_PATH = None
+    for p in FALLBACK_FONT_PATHS:
+        if os.path.exists(p):
+            FONT_PATH = p
+            break
 
 if FONT_PATH:
     font_title = pygame.font.Font(FONT_PATH, 58)
@@ -108,6 +117,8 @@ if FONT_PATH:
     font_tiny = pygame.font.Font(FONT_PATH, 16)
     font_pop = pygame.font.Font(FONT_PATH, 26)
 else:
+    # 如果连系统字体都没有，只能退回默认字体（会显示方块乱码）
+    print("错误：未找到任何可用中文字体，中文可能显示为方块。")
     font_title = pygame.font.SysFont("simhei", 58)
     font_big = pygame.font.SysFont("simhei", 42)
     font_medium = pygame.font.SysFont("simhei", 32)
